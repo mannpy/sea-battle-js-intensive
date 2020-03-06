@@ -7,17 +7,97 @@ const header = document.querySelector(".header");
 const again = document.getElementById("again");
 
 const game = {
-  ships: [
-    { location: ["26", "36", "46", "56"], hit: ["", "", "", ""] },
-    { location: ["11", "12", "13"], hit: ["", "", ""] },
-    { location: ["69", "79"], hit: ["", ""] },
-    { location: ["32"], hit: [""] }
-  ],
-  shipCount: 4
+  ships: [],
+  shipCount: 0,
+  xBoardLength: enemy.querySelector("tr").querySelectorAll("td").length,
+  yBoardLength: enemy.querySelectorAll("tr").length,
+
+  optionShip: {
+    count: [1, 2, 3, 4],
+    size: [4, 3, 2, 1]
+  },
+  collision: new Set(),
+  generateShip() {
+    for (
+      let i = 0, arrayLen = this.optionShip.count.length;
+      i < arrayLen;
+      i++
+    ) {
+      for (let j = 0, shipsLen = this.optionShip.count[i]; j < shipsLen; j++) {
+        const size = this.optionShip.size[i];
+        const ship = this.generateOptionsShip(size);
+        this.ships.push(ship);
+        this.shipCount++;
+      }
+    }
+  },
+  generateOptionsShip(shipSize) {
+    const ship = {
+      hit: [],
+      location: []
+    };
+
+    const directions = ["horizontal", "vertical"];
+    const direction = directions[Math.floor(Math.random() * directions.length)];
+
+    let x, y;
+
+    if (direction === "vertical") {
+      x = Math.floor(Math.random() * game.xBoardLength);
+      y = Math.floor(Math.random() * (game.yBoardLength - shipSize));
+    } else {
+      x = Math.floor(Math.random() * (game.xBoardLength - shipSize));
+      y = Math.floor(Math.random() * game.yBoardLength);
+    }
+
+    for (let i = 0; i < shipSize; i++) {
+      if (direction === "vertical") {
+        ship.location.push(y + i + "" + x);
+      } else {
+        ship.location.push(y + "" + (x + i));
+      }
+      ship.hit.push("");
+    }
+
+    if (this.checkCollision(ship.location)) {
+      return this.generateOptionsShip(shipSize);
+    }
+
+    this.addCollision(ship.location);
+
+    return ship;
+  },
+  checkCollision(location) {
+    for (const coord of location) {
+      if (this.collision.has(coord)) {
+        return true;
+      }
+    }
+  },
+  addCollision(location) {
+    for (let i = 0; i < location.length; i++) {
+      const coordX = location[i][1];
+      const coordY = location[i][0];
+
+      for (let y = +coordY - 1; y < +coordY + 2; y++) {
+        for (let x = +coordX - 1; x < +coordX + 2; x++) {
+          if (
+            y >= 0 &&
+            y < this.yBoardLength &&
+            x >= 0 &&
+            x < this.xBoardLength
+          ) {
+            const coord = y + "" + x;
+            this.collision.add(coord);
+          }
+        }
+      }
+    }
+  }
 };
 
 const play = {
-  record: localStorage.getItem("seaBattleRecord") || 0,
+  record: +localStorage.getItem("seaBattleRecord") || 0,
   shot: 0,
   hit: 0,
   dead: 0,
@@ -50,7 +130,7 @@ const show = {
 
 function fire(event) {
   const target = event.target;
-  if (target.tagName !== "TD" || target.className) return;
+  if (target.tagName !== "TD" || target.className || !game.shipCount) return;
   show.miss(target);
   play.updateData = "shot";
 
@@ -70,8 +150,7 @@ function fire(event) {
         }
         game.shipCount -= 1;
 
-        if (game.shipCount < 1) {
-          enemy.removeEventListener("click", fire);
+        if (!game.shipCount) {
           header.textContent = "Game Over";
           header.style.color = "red";
 
@@ -89,9 +168,31 @@ function fire(event) {
 const init = () => {
   enemy.addEventListener("click", fire);
   play.render();
+  game.generateShip();
 
   again.addEventListener("click", () => {
-    location.reload();
+    header.textContent = "SEA BATTLE";
+    header.style.color = "black";
+
+    play.shot = 0;
+    play.hit = 0;
+    play.dead = 0;
+
+    game.ships.length = 0;
+    game.shipCount = 0;
+    game.collision.clear();
+
+    for (const cell of enemy.querySelectorAll("td")) {
+      cell.className = "";
+    }
+
+    play.render();
+    game.generateShip();
+  });
+  record.addEventListener("dblclick", () => {
+    localStorage.clear();
+    play.record = 0;
+    play.render();
   });
 };
 
